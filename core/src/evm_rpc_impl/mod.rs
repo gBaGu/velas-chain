@@ -926,6 +926,7 @@ fn simulate_transaction(
     bytes.clear();
     tx.s.ok_or(Error::InvalidParams {})?.0.to_big_endian(&mut bytes);
     let s = H256::from_slice(&bytes);
+    info!("simulate_transaction: r: {}, s: {}", r.format_hex(), s.format_hex());
     let transaction = Transaction {
         nonce,
         gas_price,
