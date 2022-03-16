@@ -16,11 +16,7 @@ use evm_rpc::{
     BlockId, BlockRelId, Bytes, Either, FormatHex, Hex, RPCBlock, RPCLog, RPCLogFilter, RPCReceipt,
     RPCTopicFilter, RPCTransaction,
 };
-use evm_state::{
-    AccountProvider, AccountState, Address, BlockHeader, ExecutionResult, Gas, LogFilter,
-    Transaction, TransactionAction, TransactionInReceipt, TransactionReceipt, TransactionSignature,
-    H160, H256, U256,
-};
+use evm_state::{AccountProvider, AccountState, Address, BlockHeader, ExecutionResult, Gas, LogFilter, Transaction, TransactionAction, TransactionInReceipt, TransactionReceipt, TransactionSignature, H160, H256, U256, UnsignedTransactionWithCaller};
 use snafu::ensure;
 use snafu::ResultExt;
 use solana_runtime::bank::Bank;
@@ -888,9 +884,11 @@ fn simulate_transaction(
     };
 
     // system transfers always set s = 0x1
+    let mut is_native_swap = false;
     if Some(Hex(U256::from(0x1))) == tx.s {
         // check if it native swap, then predeposit, amount, to pass transaction
         if caller == *ETH_TO_VLX_ADDR {
+            is_native_swap = true;
             let amount = value + gas_limit * gas_price;
             executor.deposit(caller, amount)
         }
@@ -943,8 +941,18 @@ fn simulate_transaction(
     let tx_hashes = executor.evm_backend.get_executed_transactions();
     assert!(!tx_hashes.contains(&tx_hash));
 
+    let transaction = if is_native_swap {
+        TransactionInReceipt::Unsigned(UnsignedTransactionWithCaller {
+            unsigned_tx: transaction.into(),
+            caller: *ETH_TO_VLX_ADDR,
+            chain_id: tx_chain_id,
+            signed_compatible: true
+        })
+    } else {
+        TransactionInReceipt::Signed(transaction)
+    };
     let receipt = TransactionReceipt::new(
-        TransactionInReceipt::Signed(transaction),
+        transaction,
         result.used_gas,
         executor.evm_backend.block_number(),
         tx_hashes.len() as u64 + 1,
