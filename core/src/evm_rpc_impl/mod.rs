@@ -13,7 +13,7 @@ use evm_rpc::{
     chain_mock::ChainMockERPC,
     error::{into_native_error, BlockNotFound, Error, StateNotFoundForBlock},
     trace::TraceMeta,
-    BlockId, BlockRelId, Bytes, Either, FormatHex, Hex, RPCBlock, RPCLog, RPCLogFilter, RPCReceipt,
+    BlockId, BlockRelId, Bytes, Either, Hex, RPCBlock, RPCLog, RPCLogFilter, RPCReceipt,
     RPCTopicFilter, RPCTransaction,
 };
 use evm_state::{
@@ -920,6 +920,12 @@ fn simulate_transaction(
         )
         .with_context(|| EvmStateError)?;
 
+    let mut bytes = Vec::new();
+    tx.r.ok_or(Error::InvalidParams {})?.0.to_big_endian(&mut bytes);
+    let r = H256::from_slice(&bytes);
+    bytes.clear();
+    tx.s.ok_or(Error::InvalidParams {})?.0.to_big_endian(&mut bytes);
+    let s = H256::from_slice(&bytes);
     let transaction = Transaction {
         nonce,
         gas_price,
@@ -928,14 +934,8 @@ fn simulate_transaction(
         value,
         signature: TransactionSignature {
             v: *tx.v.ok_or(Error::InvalidParams {})?,
-            r: tx
-                .r
-                .map(|r| H256::from_hex(&r.format_hex()))
-                .ok_or(Error::InvalidParams {})??,
-            s: tx
-                .s
-                .map(|s| H256::from_hex(&s.format_hex()))
-                .ok_or(Error::InvalidParams {})??,
+            r,
+            s,
         },
         input,
     };
