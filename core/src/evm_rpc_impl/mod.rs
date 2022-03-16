@@ -921,14 +921,8 @@ fn simulate_transaction(
         .with_context(|| EvmStateError)?;
 
     let mut bytes: [u8; 32] = [0; 32];
-    info!(
-        "simulate_transaction: tx.r: {}, tx.s: {}",
-        tx.r.ok_or(Error::InvalidParams {})?.format_hex(),
-        tx.s.ok_or(Error::InvalidParams {})?.format_hex()
-    );
     tx.r.ok_or(Error::InvalidParams {})?.0.to_big_endian(&mut bytes);
     let r = H256::from_slice(&bytes);
-    //bytes.clear();
     tx.s.ok_or(Error::InvalidParams {})?.0.to_big_endian(&mut bytes);
     let s = H256::from_slice(&bytes);
     info!("simulate_transaction: r: {}, s: {}", r.format_hex(), s.format_hex());
@@ -957,6 +951,7 @@ fn simulate_transaction(
         result.tx_logs.clone(),
         (result.exit_reason.clone(), result.exit_data.clone()),
     );
+    info!("simulate_transaction: receipt: {:?}", receipt);
     executor
         .evm_backend
         .push_transaction_receipt(tx_hash, receipt);
