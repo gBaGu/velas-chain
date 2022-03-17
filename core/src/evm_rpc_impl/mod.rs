@@ -953,7 +953,7 @@ fn simulate_transaction(
     };
     let receipt = TransactionReceipt::new(
         transaction,
-        result.used_gas,
+        if is_native_swap { 0 } else { result.used_gas },
         executor.evm_backend.block_number(),
         tx_hashes.len() as u64 + 1,
         result.tx_logs.clone(),
