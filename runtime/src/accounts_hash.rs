@@ -359,7 +359,9 @@ impl AccountsHash {
     }
 
     pub fn accumulate_account_hashes(mut hashes: Vec<(Pubkey, Hash)>) -> Hash {
+        info!("accumulate_account_hashes: hashes={:?}", hashes);
         Self::sort_hashes_by_pubkey(&mut hashes);
+        info!("accumulate_account_hashes: sorted hashes={:?}", hashes);
 
         Self::compute_merkle_root_loop(hashes, MERKLE_FANOUT, |i| i.1)
     }
