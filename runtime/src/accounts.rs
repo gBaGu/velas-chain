@@ -810,6 +810,7 @@ impl Accounts {
             .get(&slot)
             .expect("No bank hash was found for this bank, that should not be possible")
             .clone();
+        info!("bank_hash_info_at: hash_info={:?}, delta_hash={}", hash_info, delta_hash);
         hash_info.hash = delta_hash;
         hash_info
     }
