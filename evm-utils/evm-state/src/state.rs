@@ -666,6 +666,7 @@ impl EvmState {
                     let native_blockhash = H256::from_slice(&last_blockhash);
                     let changes = incomming.state.state_updates.clone();
                     let committed = incomming.take().commit_block(slot, native_blockhash);
+                    info!("try_commit: evm header={:?}, txs={:?}", committed.state.block, committed.state.committed_transactions);
                     let last_hash = committed.state.block.hash();
                     let mut new_backend = committed.into();
                     std::mem::swap(self, &mut new_backend);
