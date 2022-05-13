@@ -2156,10 +2156,11 @@ impl Bank {
 
         inc_new_counter_info!("commit-evm-block-ms", measure.as_ms() as usize);
 
-        debug!(
-            "Set evm state root to {:?} at block {}",
+        info!(
+            "Set evm state root to {:?} at block {}, whole block: {:?}",
             self.evm_state.read().unwrap().last_root(),
-            self.evm_state.read().unwrap().block_number()
+            self.evm_state.read().unwrap().block_number(),
+            self.evm_block().unwrap()
         );
 
         let mut w_evm_blockhash_queue = self
