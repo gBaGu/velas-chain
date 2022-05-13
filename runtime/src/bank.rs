@@ -2157,10 +2157,9 @@ impl Bank {
         inc_new_counter_info!("commit-evm-block-ms", measure.as_ms() as usize);
 
         info!(
-            "Set evm state root to {:?} at block {}, whole block: {:?}",
+            "Set evm state root to {:?} at block {}",
             self.evm_state.read().unwrap().last_root(),
-            self.evm_state.read().unwrap().block_number(),
-            self.evm_block().unwrap()
+            self.evm_state.read().unwrap().block_number()
         );
 
         let mut w_evm_blockhash_queue = self
@@ -2169,6 +2168,7 @@ impl Bank {
             .expect("evm blockchashes poisoned");
 
         if let Some((hash, changes)) = hash {
+            info!("commit_evm: hash={}, changes={:?}", hash, changes);
             *self
                 .evm_changed_list
                 .write()
