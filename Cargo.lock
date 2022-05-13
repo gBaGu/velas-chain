@@ -1630,7 +1630,7 @@ dependencies = [
 [[package]]
 name = "evm"
 version = "0.23.0"
-source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a78700f2e79ec7761375f571587a4f5372ed1738"
+source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a1f5c9ba5c85d50b8ae0d5ee4c2079da560f9be7"
 dependencies = [
  "ethereum",
  "evm-core",
@@ -1687,7 +1687,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.23.0"
-source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a78700f2e79ec7761375f571587a4f5372ed1738"
+source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a1f5c9ba5c85d50b8ae0d5ee4c2079da560f9be7"
 dependencies = [
  "parity-scale-codec",
  "primitive-types",
@@ -1697,7 +1697,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.23.0"
-source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a78700f2e79ec7761375f571587a4f5372ed1738"
+source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a1f5c9ba5c85d50b8ae0d5ee4c2079da560f9be7"
 dependencies = [
  "evm-core",
  "evm-runtime",
@@ -1732,7 +1732,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.23.0"
-source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a78700f2e79ec7761375f571587a4f5372ed1738"
+source = "git+https://github.com/gBaGu/evm?branch=debug/add-traces#a1f5c9ba5c85d50b8ae0d5ee4c2079da560f9be7"
 dependencies = [
  "evm-core",
  "primitive-types",
