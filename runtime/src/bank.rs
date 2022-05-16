@@ -2168,7 +2168,7 @@ impl Bank {
             .expect("evm blockchashes poisoned");
 
         if let Some((hash, changes)) = hash {
-            info!("commit_evm: hash={}, changes={:?}", hash, changes);
+            // info!("commit_evm: hash={}, changes={:?}", hash, changes);
             *self
                 .evm_changed_list
                 .write()
