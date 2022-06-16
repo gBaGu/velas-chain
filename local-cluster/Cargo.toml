@@ -15,7 +15,7 @@ itertools = "0.9.0"
 gag = "0.1.10"
 fs_extra = "1.2.0"
 log = "0.4.11"
-rand = "0.7.0"
+rand = "0.8.4"
 rayon = "1.5.0"
 solana-config-program = { path = "../programs/config", version = "=1.6.14" }
 solana-core = { path = "../core", version = "=1.6.14" }
