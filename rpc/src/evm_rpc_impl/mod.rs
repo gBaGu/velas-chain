@@ -718,6 +718,7 @@ impl TraceERPC for TraceErpcImpl {
         meta_info: Option<TraceMeta>,
     ) -> BoxFuture<Result<Vec<evm_rpc::trace::TraceResultsWithTransactionHash>, Error>> {
         Box::pin(async move {
+            warn!("debug replay block: start");
             let block = if let Some(block) = block_by_number(meta.clone(), block_num, true).await? {
                 block
             } else {
@@ -1191,6 +1192,7 @@ async fn block_by_number(
     full: bool,
 ) -> Result<Option<RPCBlock>, Error> {
     let num = block_parse_confirmed_num(Some(block), &meta).await;
+    warn!("debug replay block: getting block by num {:?}", num);
     let evm_block = match num {
         Some(block_num) => meta.get_evm_block_by_id(block_num).await,
         None => None,
