@@ -3,7 +3,7 @@ mod evm_loader_instructions;
 pub mod evm_types;
 pub mod instruction;
 mod processor;
-mod state;
+pub mod state;
 
 pub use state::get_state_size;
 

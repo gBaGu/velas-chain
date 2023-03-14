@@ -14,21 +14,24 @@ use serde_json::{json, Value};
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 
+use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
     client_error::{ClientError, ClientErrorKind, Result as ClientResult},
-    rpc_client::serialize_and_encode,
-    rpc_config::RpcSendTransactionConfig,
+    rpc_client::{parse_keyed_accounts, serialize_and_encode},
+    rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcSendTransactionConfig},
     rpc_custom_error,
     rpc_request::{RpcError, RpcRequest, RpcResponseErrorData},
     rpc_response::Response as RpcResponse,
     rpc_response::*,
 };
 use solana_sdk::{
+    account::Account,
     clock::{Slot, DEFAULT_MS_PER_SLOT},
     commitment_config::CommitmentConfig,
     fee_calculator::FeeCalculator,
     hash::Hash,
     message::Message,
+    pubkey::Pubkey,
     signature::Signature,
     transaction::uses_durable_nonce,
 };
@@ -234,6 +237,46 @@ impl AsyncRpcClient {
             json!([evm_rpc::Hex(*hash)]),
         )
         .await
+    }
+
+    pub async fn get_program_accounts(
+        &self,
+        pubkey: &Pubkey,
+    ) -> ClientResult<Vec<(Pubkey, Account)>> {
+        self.get_program_accounts_with_config(
+            pubkey,
+            RpcProgramAccountsConfig {
+                account_config: RpcAccountInfoConfig {
+                    encoding: Some(UiAccountEncoding::Base64Zstd),
+                    ..RpcAccountInfoConfig::default()
+                },
+                ..RpcProgramAccountsConfig::default()
+            },
+        )
+        .await
+    }
+
+    pub async fn get_program_accounts_with_config(
+        &self,
+        pubkey: &Pubkey,
+        config: RpcProgramAccountsConfig,
+    ) -> ClientResult<Vec<(Pubkey, Account)>> {
+        let commitment = config.account_config.commitment.unwrap_or_default();
+        let account_config = RpcAccountInfoConfig {
+            commitment: Some(commitment),
+            ..config.account_config
+        };
+        let config = RpcProgramAccountsConfig {
+            account_config,
+            ..config
+        };
+        let accounts: Vec<RpcKeyedAccount> = self
+            .send(
+                RpcRequest::GetProgramAccounts,
+                json!([pubkey.to_string(), config]),
+            )
+            .await?;
+        parse_keyed_accounts(accounts, RpcRequest::GetProgramAccounts)
     }
 
     pub async fn get_version(&self) -> ClientResult<RpcVersionInfo> {

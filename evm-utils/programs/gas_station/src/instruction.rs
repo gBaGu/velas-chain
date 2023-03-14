@@ -12,6 +12,12 @@ pub enum TxFilter {
 }
 
 impl TxFilter {
+    pub fn get_contract(&self) -> evm_types::Address {
+        match self {
+            Self::InputStartsWith { contract, ..} => *contract,
+        }
+    }
+
     pub fn is_match(&self, tx: &evm_types::Transaction) -> bool {
         match self {
             Self::InputStartsWith{ contract, input_prefix } => {

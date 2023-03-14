@@ -1929,6 +1929,8 @@ dependencies = [
  "solana-rpc",
  "solana-runtime",
  "solana-sdk",
+ "solana-streamer",
+ "solana-test-validator",
  "solana-transaction-status",
  "solana-version",
  "structopt",

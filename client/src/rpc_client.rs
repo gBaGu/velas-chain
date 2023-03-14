@@ -4932,7 +4932,7 @@ fn get_rpc_request_str(rpc_addr: SocketAddr, tls: bool) -> String {
     }
 }
 
-fn parse_keyed_accounts(
+pub fn parse_keyed_accounts(
     accounts: Vec<RpcKeyedAccount>,
     request: RpcRequest,
 ) -> ClientResult<Vec<(Pubkey, Account)>> {

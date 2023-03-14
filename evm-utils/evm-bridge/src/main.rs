@@ -4,6 +4,7 @@ mod rpc_client;
 mod tx_filter;
 
 use log::*;
+use std::borrow::Borrow;
 use std::fs::File;
 use std::future::ready;
 use std::path::PathBuf;
@@ -70,10 +71,11 @@ use pool::{
 use rpc_client::AsyncRpcClient;
 use tx_filter::TxFilter;
 
+use borsh::BorshDeserialize;
 use rlp::Encodable;
 use secp256k1::Message;
-use std::result::Result as StdResult;
 use solana_rpc::rpc::{BatchId, BatchStateMap};
+use std::result::Result as StdResult;
 
 type EvmResult<T> = StdResult<T, evm_rpc::Error>;
 
@@ -195,7 +197,7 @@ pub struct EvmBridge {
     pub batch_state_map: BatchStateMap,
     max_batch_duration: Option<Duration>,
     gas_station_program_id: Option<Pubkey>,
-    redirect_to_proxy_filters: Vec<EvmContractToPayerKeys>,
+    redirect_to_proxy_filters: HashMap<Address, Vec<EvmContractToPayerKeys>>,
 }
 
 impl EvmBridge {
@@ -246,15 +248,14 @@ impl EvmBridge {
             batch_state_map: Default::default(),
             max_batch_duration: None,
             gas_station_program_id: None,
-            redirect_to_proxy_filters: vec![],
+            redirect_to_proxy_filters: Default::default(),
         }
     }
 
     pub fn check_batch_timeout(&self, id: BatchId) -> Result<()> {
         let current = self.batch_state_map.get_duration(&id);
         debug!("Current batch ({}) duration {:?}", id, current);
-        if matches!(self.get_max_batch_duration(), Some(max_duration) if current > max_duration )
-        {
+        if matches!(self.get_max_batch_duration(), Some(max_duration) if current > max_duration ) {
             let mut error = jsonrpc_core::Error::internal_error();
             error.message = "Batch is taking too long".to_string();
             return Err(error);
@@ -277,18 +278,10 @@ impl EvmBridge {
     fn set_redirect_to_proxy_filters(
         &mut self,
         gas_station_program_id: Pubkey,
-        redirect_to_proxy_filters: Vec<EvmContractToPayerKeys>,
+        redirect_to_proxy_filters: HashMap<Address, Vec<EvmContractToPayerKeys>>,
     ) {
         self.gas_station_program_id = Some(gas_station_program_id);
-        self.redirect_to_proxy_filters = redirect_to_proxy_filters
-            .into_iter()
-            .map(|mut item| {
-                let (payer_key, _) =
-                    Pubkey::find_program_address(&[item.owner.as_ref()], &gas_station_program_id);
-                item.gas_station_payer = payer_key;
-                item
-            })
-            .collect();
+        self.redirect_to_proxy_filters = redirect_to_proxy_filters;
     }
 
     /// Wrap evm tx into solana, optionally add meta keys, to solana signature.
@@ -444,6 +437,45 @@ impl EvmBridge {
 
     fn should_pay_for_gas(&self, tx: &Transaction) -> bool {
         !self.whitelist.is_empty() && self.whitelist.iter().any(|f| f.is_match(tx))
+    }
+
+    pub async fn fetch_gas_station_filters(
+        &self,
+        gas_station_id: &Pubkey,
+    ) -> HashMap<Address, Vec<EvmContractToPayerKeys>> {
+        let mut filter_map: HashMap<_, Vec<_>> = HashMap::default();
+        for (pubkey, acc) in self
+            .rpc_client
+            .get_program_accounts(gas_station_id)
+            .await
+            .unwrap()
+        {
+            let acc: evm_gas_station::state::Payer =
+                BorshDeserialize::deserialize(&mut acc.data.borrow()).unwrap();
+            for filter in acc.filters {
+                filter_map
+                    .entry(filter.get_contract())
+                    .or_default()
+                    .push(EvmContractToPayerKeys {
+                        filter,
+                        gas_station_payer: acc.payer,
+                        storage_acc: pubkey,
+                    });
+            }
+        }
+        filter_map
+    }
+
+    fn find_gas_station_filter(
+        &self,
+        tx: &evm_gas_station::evm_types::Transaction,
+    ) -> Option<EvmContractToPayerKeys> {
+        if let evm_gas_station::evm_types::TransactionAction::Call(contract) = tx.action {
+            if let Some(filters) = self.redirect_to_proxy_filters.get(&contract) {
+                return filters.iter().find(|val| val.filter.is_match(tx)).cloned();
+            }
+        }
+        None
     }
 }
 
@@ -1047,43 +1079,11 @@ pub enum ParseEvmContractToPayerKeysError {
     InvalidPubkey(String),
 }
 
-#[derive(Debug)]
-struct EvmContractToPayerKeys {
-    contract: Address,
-    owner: Pubkey,
+#[derive(Clone, Debug)]
+pub struct EvmContractToPayerKeys {
+    filter: evm_gas_station::instruction::TxFilter,
     gas_station_payer: Pubkey,
     storage_acc: Pubkey,
-}
-
-impl FromStr for EvmContractToPayerKeys {
-    type Err = ParseEvmContractToPayerKeysError;
-
-    fn from_str(s: &str) -> StdResult<Self, Self::Err> {
-        let (contract, keys) =
-            s.split_once(':')
-                .ok_or_else(|| ParseEvmContractToPayerKeysError::InvalidFormat(
-                    s.to_string(),
-                ))?;
-        let (owner, storage_acc) =
-            keys.split_once(':')
-                .ok_or_else(|| ParseEvmContractToPayerKeysError::InvalidFormat(
-                    s.to_string(),
-                ))?;
-        let contract = Address::from_str(contract).map_err(|_| {
-            ParseEvmContractToPayerKeysError::InvalidEvmContract(contract.to_string())
-        })?;
-        let owner = Pubkey::from_str(owner)
-            .map_err(|_| ParseEvmContractToPayerKeysError::InvalidPubkey(owner.to_string()))?;
-        let storage_acc = Pubkey::from_str(storage_acc).map_err(|_| {
-            ParseEvmContractToPayerKeysError::InvalidPubkey(storage_acc.to_string())
-        })?;
-        Ok(Self {
-            contract,
-            owner,
-            gas_station_payer: Pubkey::default(),
-            storage_acc,
-        })
-    }
 }
 
 #[derive(Debug, structopt::StructOpt)]
@@ -1119,8 +1119,6 @@ struct Args {
 
     #[structopt(long = "gas-station")]
     gas_station_program_id: Option<Pubkey>,
-    #[structopt(long = "redirect-to-proxy")]
-    redirect_contracts_to_proxy: Vec<EvmContractToPayerKeys>,
 }
 
 impl Args {
@@ -1218,16 +1216,9 @@ async fn main(args: Args) -> StdResult<(), Box<dyn std::error::Error>> {
     if let Some(max_duration) = args.max_batch_duration.map(Duration::from_secs) {
         meta.set_max_batch_duration(max_duration);
     }
-    if !args.redirect_contracts_to_proxy.is_empty() {
-        let gas_station_program_id = args
-            .gas_station_program_id
-            .expect("gas-station program id is missing");
-        info!("Redirecting evm transaction to gas station: {}, filters: {:?}",
-            gas_station_program_id, args.redirect_contracts_to_proxy);
-        meta.set_redirect_to_proxy_filters(
-            gas_station_program_id,
-            args.redirect_contracts_to_proxy,
-        );
+    if let Some(gas_station_id) = args.gas_station_program_id {
+        let filter_map = meta.fetch_gas_station_filters(&gas_station_id).await;
+        meta.set_redirect_to_proxy_filters(gas_station_id, filter_map);
     }
     let meta = Arc::new(meta);
 
@@ -1405,7 +1396,7 @@ mod tests {
             batch_state_map: Default::default(),
             max_batch_duration: None,
             gas_station_program_id: None,
-            redirect_to_proxy_filters: vec![],
+            redirect_to_proxy_filters: Default::default(),
         });
 
         let rpc = BridgeErpcImpl {};
