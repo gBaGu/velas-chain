@@ -183,6 +183,15 @@ impl AsyncRpcClient {
         }
     }
 
+    pub async fn get_evm_balance(&self, address: &Address) -> ClientResult<U256> {
+        self.send::<evm_rpc::Hex<_>>(
+            RpcRequest::EthGetBalance,
+            json!([evm_rpc::Hex(*address), "latest"]),
+        )
+            .await
+            .map(|h| h.0)
+    }
+
     pub async fn get_evm_block_by_hash(
         &self,
         block_hash: Hex<H256>,
@@ -237,6 +246,28 @@ impl AsyncRpcClient {
             json!([evm_rpc::Hex(*hash)]),
         )
         .await
+    }
+
+    pub async fn get_balance(&self, pubkey: &Pubkey) -> ClientResult<u64> {
+        Ok(self
+            .get_balance_with_commitment(pubkey, CommitmentConfig::default())
+            .await?
+            .value)
+    }
+
+    pub async fn get_balance_with_commitment(
+        &self,
+        pubkey: &Pubkey,
+        commitment_config: CommitmentConfig,
+    ) -> RpcResult<u64> {
+        self.send(
+            RpcRequest::GetBalance,
+            json!([
+                pubkey.to_string(),
+                commitment_config
+            ]),
+        )
+            .await
     }
 
     pub async fn get_program_accounts(
